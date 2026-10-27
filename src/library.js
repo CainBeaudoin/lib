@@ -3,17 +3,23 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
+import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 import { clone as skeletonClone } from 'three/addons/utils/SkeletonUtils.js';
 
+const BINARY = /\.(glb|fbx|hdr)$/i;
+
 export class AssetLibrary {
-  static async load(baseUrl = new URL('../assets/', import.meta.url).href) {
+  // options.binarySuffix: set to '.b64.txt' when .glb/.fbx/.hdr files are hosted
+  // as base64 text (for hosts that only serve web file types)
+  static async load(baseUrl = new URL('../assets/', import.meta.url).href, options = {}) {
     const base = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
     const manifest = await (await fetch(base + 'manifest.json')).json();
-    return new AssetLibrary(base, manifest);
+    return new AssetLibrary(base, manifest, options);
   }
 
-  constructor(base, manifest) {
+  constructor(base, manifest, { binarySuffix = '' } = {}) {
     this.base = base;
+    this.binarySuffix = binarySuffix;
     this.assets = manifest.assets;
     this.byId = new Map(this.assets.map((a) => [a.id, a]));
     this.gltf = new GLTFLoader();
@@ -43,12 +49,14 @@ export class AssetLibrary {
   async model(id, { size = null, shadows = true } = {}) {
     const a = this.get(id);
     const src = await this._once(id, async () => {
+      const buffer = await this.binary(a.path);
+      const dir = this.base + a.path.slice(0, a.path.lastIndexOf('/') + 1);
       if (a.format === 'fbx') {
-        const obj = await this.fbx.loadAsync(this.base + a.path);
+        const obj = this.fbx.parse(buffer, dir);
         fixFbxMaterials(obj);
         return { scene: obj, animations: obj.animations };
       }
-      const g = await this.gltf.loadAsync(this.base + a.path);
+      const g = await new Promise((resolve, reject) => this.gltf.parse(buffer, dir, resolve, reject));
       return { scene: g.scene, animations: g.animations };
     });
     const object = skeletonClone(src.scene);
@@ -92,6 +100,32 @@ export class AssetLibrary {
       aoMap: load('ao'),
       ...params,
     });
+  }
+
+  // Equirectangular HDR environment texture, ready for stage.setHdri()
+  hdri(id) {
+    return this._once('hdri:' + id, async () => {
+      const d = new RGBELoader().parse(await this.binary(this.get(id).path));
+      const tex = new THREE.DataTexture(d.data, d.width, d.height, THREE.RGBAFormat, d.type);
+      tex.colorSpace = THREE.LinearSRGBColorSpace;
+      tex.minFilter = tex.magFilter = THREE.LinearFilter;
+      tex.generateMipmaps = false;
+      tex.flipY = true;
+      tex.needsUpdate = true;
+      return tex;
+    });
+  }
+
+  // Raw bytes of an asset file, decoding base64-hosted copies when configured
+  async binary(path) {
+    if (!this.binarySuffix || !BINARY.test(path)) {
+      return (await fetch(this.base + path)).arrayBuffer();
+    }
+    const text = await (await fetch(this.base + path + this.binarySuffix)).text();
+    const bin = atob(text.trim());
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
   }
 
   sprite(name) {

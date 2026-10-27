@@ -125,19 +125,23 @@ function clearContent() {
 function toolbar(extra = []) {
   const tb = $('toolbar'); tb.innerHTML = '';
   const sel = document.createElement('select'); sel.className = 'chip';
-  sel.innerHTML = `<option value="">Studio light</option>` + HDRIS.map((h) => `<option value="${h.path}">${h.id.split('/').pop().replaceAll('_', ' ')}</option>`).join('');
+  sel.innerHTML = `<option value="">Studio light</option>` + HDRIS.map((h) => `<option value="${h.id}">${h.id.split('/').pop().replaceAll('_', ' ')}</option>`).join('');
   sel.value = settings.hdri;
-  sel.onchange = async () => { settings.hdri = sel.value; await stage.setHdri(sel.value ? './assets/' + sel.value : null, settings.bg); };
+  sel.onchange = async () => { settings.hdri = sel.value; await applyHdri(); };
   tb.append(sel);
   const toggle = (label, key, apply) => {
     const b = document.createElement('button'); b.className = 'chip' + (settings[key] ? ' on' : ''); b.textContent = label;
     b.onclick = () => { settings[key] = !settings[key]; b.classList.toggle('on', settings[key]); apply(settings[key]); };
     tb.append(b);
   };
-  toggle('Sky', 'bg', () => stage.setHdri(settings.hdri ? './assets/' + settings.hdri : null, settings.bg));
+  toggle('Sky', 'bg', applyHdri);
   toggle('Bloom', 'bloom', (v) => { stage.bloomPass.enabled = v; });
   toggle('AO', 'ao', (v) => { stage.aoPass.enabled = v; });
   for (const el of extra) tb.append(el);
+}
+async function applyHdri() {
+  await stage.setHdri(settings.hdri ? await lib.hdri(settings.hdri) : null, settings.bg);
+  if (scene.fog) scene.fog.color.set(scene.background.isColor ? scene.background : 0x0b0d12);
 }
 function chip(label, onclick) { const b = document.createElement('button'); b.className = 'chip'; b.textContent = label; b.onclick = onclick; return b; }
 

@@ -82,13 +82,14 @@ export function createStage(container, options = {}) {
 
   const stage = {
     renderer, scene, camera, composer, sun, ground, bloomPass, aoPass,
-    async setHdri(url, showBackground = o.showBackground) {
-      if (!url) {
+    // source: an .hdr url, an already-loaded texture (e.g. lib.hdri(id)), or null for studio light
+    async setHdri(source, showBackground = o.showBackground) {
+      if (!source) {
         scene.environment = neutralEnv;
         scene.background = new THREE.Color(o.background);
         return;
       }
-      const tex = await new RGBELoader().loadAsync(url);
+      const tex = source.isTexture ? source : await new RGBELoader().loadAsync(source);
       tex.mapping = THREE.EquirectangularReflectionMapping;
       const env = pmrem.fromEquirectangular(tex).texture;
       scene.environment = env;
