@@ -13,6 +13,23 @@ PACKS = {
   "weapons/guns":              ("Quaternius — Ultimate Gun Pack", "Quaternius", "https://quaternius.com/packs/ultimategun.html"),
   "turrets":                   ("Quaternius — Turret Pack", "Quaternius", "https://quaternius.com/packs/turretpack.html"),
   "characters/robot":          ("Quaternius — Animated Robot", "Quaternius", "https://quaternius.com/packs/animatedrobot.html"),
+  "mechs/space":               ("Quaternius — Ultimate Space Kit", "Quaternius", "https://quaternius.com/packs/ultimatespacekit.html"),
+  "characters/astronauts":     ("Quaternius — Ultimate Space Kit", "Quaternius", "https://quaternius.com/packs/ultimatespacekit.html"),
+  "enemies/space":             ("Quaternius — Ultimate Space Kit", "Quaternius", "https://quaternius.com/packs/ultimatespacekit.html"),
+  "vehicles/space":            ("Quaternius — Ultimate Space Kit", "Quaternius", "https://quaternius.com/packs/ultimatespacekit.html"),
+  "pickups/space":             ("Quaternius — Ultimate Space Kit", "Quaternius", "https://quaternius.com/packs/ultimatespacekit.html"),
+  "environment/planet":        ("Quaternius — Ultimate Space Kit", "Quaternius", "https://quaternius.com/packs/ultimatespacekit.html"),
+  "characters/cyberpunk":      ("Quaternius — Cyberpunk Game Kit", "Quaternius", "https://quaternius.com/packs/cyberpunkgamekit.html"),
+  "enemies/cyberpunk":         ("Quaternius — Cyberpunk Game Kit", "Quaternius", "https://quaternius.com/packs/cyberpunkgamekit.html"),
+  "turrets/cyberpunk":         ("Quaternius — Cyberpunk Game Kit", "Quaternius", "https://quaternius.com/packs/cyberpunkgamekit.html"),
+  "characters/soldiers":       ("Quaternius — Toon Shooter Game Kit", "Quaternius", "https://quaternius.com/packs/toonshootergamekit.html"),
+  "enemies/monsters-big":      ("Quaternius — Ultimate Monsters", "Quaternius", "https://quaternius.com/packs/ultimatemonsters.html"),
+  "enemies/monsters-blob":     ("Quaternius — Ultimate Monsters", "Quaternius", "https://quaternius.com/packs/ultimatemonsters.html"),
+  "enemies/monsters-flying":   ("Quaternius — Ultimate Monsters", "Quaternius", "https://quaternius.com/packs/ultimatemonsters.html"),
+  "audio/sci-fi":              ("Kenney — Sci-fi Sounds", "Kenney", "https://kenney.nl/assets/sci-fi-sounds"),
+  "audio/impact":              ("Kenney — Impact Sounds", "Kenney", "https://kenney.nl/assets/impact-sounds"),
+  "audio/interface":           ("Kenney — Interface Sounds", "Kenney", "https://kenney.nl/assets/interface-sounds"),
+  "audio/digital":             ("Kenney — Digital Audio", "Kenney", "https://kenney.nl/assets/digital-audio"),
   "hdri":                      ("Poly Haven HDRIs", "Poly Haven", "https://polyhaven.com/hdris"),
   "textures":                  ("ambientCG PBR materials", "ambientCG", "https://ambientcg.com"),
 }
@@ -30,7 +47,7 @@ for folder, (pack, author, url) in PACKS.items():
         continue
     for f in sorted(os.listdir(d)):
         name, ext = os.path.splitext(f); ext = ext[1:].lower()
-        kind = {"glb": "model", "fbx": "model", "hdr": "hdri", "png": "sprite"}.get(ext)
+        kind = {"glb": "model", "fbx": "model", "hdr": "hdri", "png": "sprite", "ogg": "sound"}.get(ext)
         if not kind: continue
         it = {"id": f"{folder}/{name}", "type": kind, "category": folder.split("/")[0], "group": folder,
               "path": f"{folder}/{f}", "format": ext, "pack": pack, "author": author, "source": url, "license": CC0}

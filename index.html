@@ -25,7 +25,7 @@
   header h1 { font-size: 15px; font-weight: 600; margin: 0 0 2px; letter-spacing: 0.2px; }
   header p { margin: 0; color: var(--muted); font-size: 12px; }
   .tabs { display: flex; gap: 4px; padding: 0 12px 10px; }
-  .tabs button { flex: 1; background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 7px 0; border-radius: 8px; font: inherit; font-size: 12px; cursor: pointer; }
+  .tabs button { flex: 1 1 auto; background: transparent; border: 1px solid var(--line); color: var(--muted); padding: 7px 6px; border-radius: 8px; font: inherit; font-size: 12px; white-space: nowrap; cursor: pointer; }
   .tabs button.on { background: var(--panel-2); color: var(--text); border-color: #344055; }
   .search { margin: 0 12px 8px; }
   .search input { width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--text); border-radius: 8px; padding: 8px 10px; font: inherit; outline: none; }
@@ -70,6 +70,7 @@
       <button data-tab="vfx">VFX</button>
       <button data-tab="powerups">Power-ups</button>
       <button data-tab="materials">Materials</button>
+      <button data-tab="audio">Audio</button>
     </div>
     <div class="search"><input id="q" placeholder="Search models…" autocomplete="off"></div>
     <div class="list" id="list"></div>
@@ -89,6 +90,7 @@ import { createStage } from './src/stage.js';
 import { AssetLibrary, fitToSize } from './src/library.js';
 import { VFX } from './src/vfx.js';
 import { createPowerUp, POWERUP_TYPES } from './src/powerups.js';
+import { SoundBoard, SFX_PRESETS } from './src/sfx.js';
 
 const $ = (id) => document.getElementById(id);
 const lib = await AssetLibrary.load('./assets/');
@@ -97,15 +99,22 @@ const { scene, camera, renderer } = stage;
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 const vfx = await new VFX(scene, { spriteBase: './assets/vfx/sprites/' }).init();
+const sfx = new SoundBoard(camera, { base: './assets/', volume: 0.6 }).attach(scene);
+const sounds = lib.find({ type: 'sound' });
 const clock = new THREE.Clock();
 
 const HDRIS = lib.find({ type: 'hdri' });
 const GROUP_LABELS = {
-  'mechs': 'Mechs (animated)', 'characters/robot': 'Robot (animated)', 'weapons/guns': 'Guns', 'weapons/blasters': 'Blasters',
-  'turrets': 'Turrets', 'space/ships': 'Spaceships', 'space/kit': 'Space kit', 'environment/space-station': 'Space station', 'environment/prototype': 'Prototype / blockout',
+  'mechs': 'Mechs', 'mechs/space': 'Mechs: space crew',
+  'characters/cyberpunk': 'Hero: cyberpunk', 'characters/soldiers': 'Soldiers', 'characters/astronauts': 'Astronauts', 'characters/robot': 'Robot',
+  'enemies/cyberpunk': 'Enemies: cyberpunk', 'enemies/space': 'Enemies: space', 'enemies/monsters-big': 'Monsters: big',
+  'enemies/monsters-blob': 'Monsters: blob', 'enemies/monsters-flying': 'Monsters: flying',
+  'weapons/guns': 'Guns', 'weapons/blasters': 'Blasters', 'turrets': 'Turrets', 'turrets/cyberpunk': 'Turrets: cyberpunk',
+  'pickups/space': 'Pickups', 'vehicles/space': 'Vehicles', 'space/ships': 'Spaceships', 'space/kit': 'Space kit',
+  'environment/planet': 'Planet outpost', 'environment/space-station': 'Space station', 'environment/prototype': 'Prototype / blockout',
 };
 const models = lib.find({ type: 'model' });
-$('count').textContent = `${lib.assets.length} CC0 assets · ${models.length} models · free for commercial use`;
+$('count').textContent = `${lib.assets.length} CC0 assets · ${models.length} models · ${sounds.length} sounds · free for commercial use`;
 
 let content = new THREE.Group(); scene.add(content);
 let updaters = [];
@@ -205,12 +214,38 @@ async function showModel(id) {
 }
 
 // ---------------------------------------------------------------- VFX tab
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const VFX_DEMOS = {
-  'Explosion': () => vfx.explosion(new THREE.Vector3(rnd(-1.5, 1.5), 0.4, rnd(-1.5, 1.5)), { scale: 1 }),
+  'Explosion': () => { const p = V(rnd(-1.5, 1.5), 0.4, rnd(-1.5, 1.5)); vfx.explosion(p); sfx.play('explosion', { position: p }); },
   'Muzzle flash': () => fireGun(),
-  'Laser': () => vfx.laser(new THREE.Vector3(-4, 1.4, 0), new THREE.Vector3(rnd(-0.5, 0.5), rnd(0.6, 2), rnd(-0.5, 0.5)), { color: [0xff2a4a, 0x2affb0, 0x4fa8ff][Math.floor(Math.random() * 3)] }),
-  'Impact': () => vfx.impact(new THREE.Vector3(rnd(-1, 1), 0.05, rnd(-1, 1))),
-  'Shield hit': () => { if (demo.shield) { const p = randomOnSphere(demo.shield.mesh); vfx.laser(new THREE.Vector3(-1, 2.2, -3), p, { color: 0xff8a3a, impact: false }); demo.shield.hit(p); } },
+  'Laser': () => {
+    const from = V(-4, 1.4, 0);
+    vfx.laser(from, V(rnd(-0.5, 0.5), rnd(0.6, 2), rnd(-0.5, 0.5)), { color: [0xff2a4a, 0x2affb0, 0x4fa8ff][Math.floor(Math.random() * 3)] });
+    sfx.play('laser', { position: from });
+  },
+  'Impact': () => { const p = V(rnd(-1, 1), 0.05, rnd(-1, 1)); vfx.impact(p); sfx.play('impactMetal', { position: p }); },
+  'Shield hit': () => {
+    if (!demo.shield) return;
+    const p = randomOnSphere(demo.shield.mesh);
+    vfx.laser(V(-1, 2.2, -3), p, { color: 0xff8a3a, impact: false });
+    demo.shield.hit(p); sfx.play('shield', { position: p });
+  },
+  'Lightning': () => { const to = V(rnd(-1, 1), 0.05, rnd(-1, 1)); vfx.lightning(V(rnd(-1, 1), 4, rnd(-2, 0)), to); sfx.play('zap', { position: to }); },
+  'EMP': () => { const p = V(rnd(-1, 0), 0.6, rnd(-0.5, 0.5)); vfx.emp(p, { radius: 3 }); sfx.play('explosionBig', { position: p }); },
+  'Teleport': () => { const p = V(rnd(-2, -0.5), 0, rnd(0.5, 1.5)); vfx.teleport(p); sfx.play('phaseJump', { position: p }); },
+  'Charge-up': async () => {
+    const p = V(-1.5, 1.6, 1); sfx.play('powerUp', { position: p });
+    await vfx.chargeUp(p, { duration: 0.9 });
+    vfx.laser(p, demo.mech.object.position.clone().setY(1.2), { color: 0xffb84a, width: 0.12 }); sfx.play('laserHeavy', { position: p });
+  },
+  'Damage': () => {
+    if (!demo.mech) return;
+    const head = demo.mech.object.position.clone().setY(2.3);
+    vfx.hitFlash(demo.mech.object, { color: 0xff5a3a });
+    const crit = Math.random() < 0.3;
+    vfx.damageNumber(head, crit ? `${Math.floor(rnd(80, 140))}!` : Math.floor(rnd(8, 40)), { color: crit ? '#ffcc33' : '#ffffff' });
+    sfx.play('punch', { position: head });
+  },
 };
 const demo = {};
 const rnd = (a, b) => a + Math.random() * (b - a);
@@ -224,6 +259,7 @@ function fireGun() {
   const muzzle = new THREE.Vector3(); demo.muzzle.getWorldPosition(muzzle);
   const dir = new THREE.Vector3(-1, 0, 0).applyQuaternion(demo.gun.getWorldQuaternion(new THREE.Quaternion()));
   vfx.muzzleFlash(muzzle, dir);
+  sfx.play('blaster', { position: muzzle, volume: 0.7 });
   demo.gun.position.x += 0.05; // recoil
 }
 
@@ -232,7 +268,9 @@ async function showVfx() {
   const mech = await lib.model('mechs/Stan', { size: 2.2 });
   mech.object.position.set(2.6, 0, -0.5); mech.object.rotation.y = -Math.PI / 2; mech.play('Idle');
   content.add(mech.object); updaters.push((dt) => mech.mixer.update(dt));
+  demo.mech = mech;
   demo.shield = vfx.shield(mech.object, { color: 0x4fc3ff });
+  vfx.healAura(mech.object, { color: 0x46ff9a, radius: 1 });
 
   const gunM = await lib.model('weapons/blasters/blaster-b', { size: 0.8 });
   const gunPivot = new THREE.Group(); gunPivot.position.set(-3, 1.2, 1.6); gunPivot.rotation.y = Math.PI / 2;
@@ -248,9 +286,9 @@ async function showVfx() {
   let t = 0;
   updaters.push((dt) => { t += dt; orb.position.set(Math.cos(t * 1.6) * 2.4, 1.5 + Math.sin(t * 3.2) * 0.5, Math.sin(t * 1.6) * 2.4); });
 
-  // auto demo loop
+  // auto demo loop (silent until the viewer clicks, since browsers block autoplaying audio)
   let timer = 0, step = 0; const names = Object.keys(VFX_DEMOS);
-  updaters.push((dt) => { timer += dt; if (timer > 1.1) { timer = 0; VFX_DEMOS[names[step++ % names.length]](); } });
+  updaters.push((dt) => { timer += dt; if (timer > 1.3) { timer = 0; VFX_DEMOS[names[step++ % names.length]](); } });
 
   camera.position.set(-1, 4.2, 10.5); controls.target.set(0, 0.8, -0.5); controls.update();
   toolbar(names.map((n) => chip(n, VFX_DEMOS[n])));
@@ -261,7 +299,11 @@ vfx.muzzleFlash(muzzlePos, aimDir);
 vfx.laser(from, to, { color: 0xff2a4a });
 vfx.impact(point, normal);
 const s = vfx.shield(mech);  s.hit(point);
-vfx.trail(bullet);  vfx.portal(pos);  vfx.pickupBurst(pos);`);
+vfx.lightning(from, to);  vfx.emp(pos);  vfx.teleport(pos);
+await vfx.chargeUp(pos);  vfx.healAura(mech);
+vfx.hitFlash(mech);  vfx.damageNumber(pos, 42);
+vfx.trail(bullet);  vfx.portal(pos);  vfx.pickupBurst(pos);
+sfx.play('laser', { position: from });   // src/sfx.js`);
   renderSimpleList(names.map((n) => ({ label: n, run: VFX_DEMOS[n] })));
 }
 
@@ -276,7 +318,7 @@ async function showPowerups() {
     updaters.push((dt) => p.update(dt));
     return p;
   });
-  const collect = (p) => { p.collect(vfx); setTimeout(() => p.reset(), 1500); };
+  const collect = (p) => { p.collect(vfx); sfx.play('powerUp'); setTimeout(() => p.reset(), 1500); };
   const dist = Math.max(7.5, 9.5 / camera.aspect + 3); // keep the whole row in view on narrow screens
   camera.position.set(0, dist * 0.4, dist); controls.target.set(0, 0.9, 0); controls.update();
   toolbar([chip('Collect all', () => pickups.forEach((p, i) => setTimeout(() => collect(p), i * 120)))]);
@@ -306,6 +348,31 @@ async function showMaterials(id) {
   renderSimpleList(mats.map((m) => ({ label: m.id.split('/').pop(), run: () => showMaterials(m.id), on: m.id === id })));
 }
 
+// ---------------------------------------------------------------- audio tab
+const SOUND_LABELS = { 'audio/sci-fi': 'Sci-fi', 'audio/impact': 'Impacts & footsteps', 'audio/interface': 'Interface', 'audio/digital': 'Digital / retro' };
+async function showAudio() {
+  clearContent(); current = null; await addFloor();
+  const p = createPowerUp('energy'); content.add(p.object); updaters.push((dt) => p.update(dt));
+  camera.position.set(0, 2.4, 5); controls.target.set(0, 0.9, 0); controls.update();
+  toolbar(Object.keys(SFX_PRESETS).slice(0, 8).map((n) => chip(n, () => sfx.play(n))));
+  info('Audio', `${sounds.length} sound effects · <span class="badge">CC0</span>Kenney sound packs · click any sound to play it`,
+`import { SoundBoard } from './src/sfx.js';
+const sfx = new SoundBoard(camera).attach(scene);
+sfx.play('explosion', { position: hitPos });   // 3D, random variant + pitch
+sfx.play('click');                              // 2D UI sound
+// presets: ${Object.keys(SFX_PRESETS).join(', ')}`);
+  const groups = {};
+  for (const s of sounds) (groups[s.group] ??= []).push(s);
+  $('list').innerHTML = Object.keys(SOUND_LABELS).filter((g) => groups[g]).map((g) =>
+    `<div class="group-title"><span>${SOUND_LABELS[g]}</span><span>${groups[g].length}</span></div>` +
+    groups[g].map((s) => `<button class="item" data-id="${s.id}">${s.id.split('/').pop()}</button>`).join('')).join('');
+  $('list').onclick = (e) => {
+    const b = e.target.closest('.item'); if (!b) return;
+    document.querySelectorAll('.item.on').forEach((el) => el.classList.remove('on')); b.classList.add('on');
+    sfx.play(b.dataset.id, { pitch: 0 });
+  };
+}
+
 function renderSimpleList(items) {
   $('list').innerHTML = items.map((it, i) => `<button class="item${it.on ? ' on' : ''}" data-i="${i}">${it.label}</button>`).join('');
   $('list').onclick = (e) => { const b = e.target.closest('.item'); if (b) items[+b.dataset.i].run(); };
@@ -322,15 +389,16 @@ async function setTab(t) {
     await showModel(current && lib.byId.has(current) && lib.get(current).type === 'model' ? current : 'mechs/George');
   } else if (t === 'vfx') await showVfx();
   else if (t === 'powerups') await showPowerups();
+  else if (t === 'audio') await showAudio();
   else await showMaterials();
 }
 $('tabs').onclick = (e) => { const b = e.target.closest('button'); if (b) setTab(b.dataset.tab); };
 $('q').oninput = renderModelList;
 
 const hash = decodeURIComponent(location.hash.slice(1));
-if (['vfx', 'powerups', 'materials'].includes(hash)) setTab(hash);
+if (['vfx', 'powerups', 'materials', 'audio'].includes(hash)) setTab(hash);
 else { if (lib.byId.has(hash)) current = hash; setTab('models'); }
-window.__stage = stage; window.__lib = lib; window.__vfx = vfx;
+window.__stage = stage; window.__lib = lib; window.__vfx = vfx; window.__sfx = sfx;
 
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);

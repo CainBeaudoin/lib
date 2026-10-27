@@ -440,6 +440,291 @@ export class VFX {
     this.effects.add(handle);
     return handle;
   }
+
+  // Branching electric arc that re-forks every few frames. Returns { dispose() }
+  lightning(from, to, { color = 0x8fd8ff, duration = 0.3, width = 0.08, branches = 2, impact = true } = {}) {
+    const a = from.clone(), b = to.clone();
+    const glow = new Ribbon(48, color, 1.0), core = new Ribbon(48, 0xffffff, 1.6);
+    const forks = Array.from({ length: branches }, () => new Ribbon(16, color, 0.8));
+    for (const r of [glow, core, ...forks]) this.root.add(r.mesh);
+    let t = 0, reroll = 0, path = [], forkPaths = [];
+    const regen = () => {
+      path = jaggedPath(a, b, 24, a.distanceTo(b) * 0.09);
+      forkPaths = forks.map(() => {
+        const start = path[4 + Math.floor(Math.random() * (path.length - 8))];
+        const end = start.clone().add(randDir().multiplyScalar(a.distanceTo(b) * rand(0.15, 0.3)));
+        return jaggedPath(start, end, 8, start.distanceTo(end) * 0.15);
+      });
+    };
+    regen();
+    this.flash(tmpV.copy(a).lerp(b, 0.5), color, 40, duration, a.distanceTo(b) * 1.5);
+    if (impact) this.impact(b, tmpV.subVectors(a, b), { color, scale: 0.8 });
+    this.effects.add({
+      update: (dt, camera) => {
+        t += dt; reroll += dt;
+        if (reroll > 0.045) { reroll = 0; regen(); }
+        const k = Math.max(0, 1 - t / duration);
+        const flicker = k * (0.6 + Math.random() * 0.4);
+        glow.set(path, width * 3, camera, flicker * 0.7);
+        core.set(path, width, camera, flicker);
+        forks.forEach((f, i) => f.set(forkPaths[i], width * 1.4, camera, flicker * 0.6));
+        return t < duration;
+      },
+      dispose: () => { for (const r of [glow, core, ...forks]) { this.root.remove(r.mesh); r.dispose(); } },
+    });
+  }
+
+  // Expanding electromagnetic pulse: shell, ground ring, arcs
+  emp(pos, { radius = 4, color = 0x6fd3ff, duration = 0.7 } = {}) {
+    const mat = shellMaterial(color);
+    const shell = new THREE.Mesh(new THREE.IcosahedronGeometry(1, 16), mat);
+    shell.position.copy(pos);
+    this.root.add(shell);
+    this.ring(tmpV2.set(pos.x, 0.05, pos.z), { color, radius: radius * 1.1, duration: duration * 0.8 });
+    this.flash(pos, color, 60, duration * 0.6, radius * 3);
+    for (let i = 0; i < 5; i++) {
+      const end = pos.clone().add(randDir().multiplyScalar(radius * rand(0.6, 1)));
+      end.y = Math.max(0.05, end.y);
+      setTimeout(() => this.lightning(pos, end, { color, width: 0.04, branches: 1, duration: 0.18, impact: false }), i * 60);
+    }
+    let t = 0;
+    this.effects.add({
+      update: (dt) => {
+        t += dt; const k = t / duration;
+        shell.scale.setScalar(0.2 + radius * (1 - (1 - k) ** 3));
+        mat.uniforms.opacity.value = (1 - k) ** 1.5;
+        return k < 1;
+      },
+      dispose: () => { this.root.remove(shell); shell.geometry.dispose(); mat.dispose(); },
+    });
+  }
+
+  // Beam-in / beam-out column
+  teleport(pos, { color = 0x9a7bff, height = 3.2, radius = 0.7, duration = 0.9 } = {}) {
+    const mat = columnMaterial(color);
+    const column = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, height, 32, 1, true), mat);
+    column.position.set(pos.x, pos.y + height / 2, pos.z);
+    this.root.add(column);
+    this.ring(tmpV2.set(pos.x, pos.y + 0.03, pos.z), { color, radius: radius * 2, duration: duration * 0.6 });
+    this.flash(tmpV2.set(pos.x, pos.y + 1, pos.z), color, 40, duration, 6);
+    for (let i = 0; i < 40; i++) {
+      const a = Math.random() * Math.PI * 2, r = radius * rand(0.3, 1);
+      this.pool('spark_01').emit({
+        pos: tmpV2.set(pos.x + Math.cos(a) * r, pos.y + rand(0, 0.4), pos.z + Math.sin(a) * r),
+        vel: tmpV.set(0, rand(2, 5), 0), life: rand(0.4, 0.9), size: [0.07, 0.02], stretch: 4,
+        color: 0xffffff, color2: color, delay: rand(0, 0.3),
+      });
+    }
+    let t = 0;
+    this.effects.add({
+      update: (dt) => {
+        t += dt; const k = t / duration;
+        column.scale.set(1 - k * 0.85, 1, 1 - k * 0.85);
+        mat.uniforms.opacity.value = Math.sin(Math.min(1, k * 1.2) * Math.PI);
+        mat.uniforms.time.value = t;
+        return k < 1;
+      },
+      dispose: () => { this.root.remove(column); column.geometry.dispose(); mat.dispose(); },
+    });
+  }
+
+  // Particles converge on a point while a glow grows; resolves when charged
+  chargeUp(pos, { color = 0xffb84a, duration = 1, radius = 1.2 } = {}) {
+    let t = 0, emitT = 0;
+    const glow = this.pool('light_01');
+    return new Promise((resolve) => {
+      this.effects.add({
+        update: (dt) => {
+          t += dt; emitT += dt;
+          const k = Math.min(1, t / duration);
+          while (emitT > 0.015) {
+            emitT -= 0.015;
+            const start = pos.clone().add(randDir().multiplyScalar(radius * rand(0.7, 1.2)));
+            this.pool('spark_01').emit({ pos: start, vel: tmpV.subVectors(pos, start).multiplyScalar(1 / 0.35), life: 0.35, size: [0.05, 0.1], color, color2: 0xffffff, alpha: [0, 1, 0.6] });
+          }
+          glow.emit({ pos, life: 0.05, size: [0.3 + k * 1.2, 0.3 + k * 1.2], color: 0xffffff, color2: color, alpha: [0.6, 0.6 + k * 0.4, 0] });
+          if (k >= 1) { this.flash(pos, color, 20, 0.2, 4); resolve(); }
+          return k < 1;
+        },
+      });
+    });
+  }
+
+  // Persistent healing aura under a target. Returns { dispose() }
+  healAura(target, { color = 0x46ff9a, radius = 0.9 } = {}) {
+    const disc = new THREE.Mesh(new THREE.PlaneGeometry(radius * 2.4, radius * 2.4), new THREE.MeshBasicMaterial({
+      map: this.textures.magic_02, color, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    }));
+    disc.rotation.x = -Math.PI / 2;
+    this.root.add(disc);
+    let t = 0, emitT = 0, alive = true;
+    const p = new THREE.Vector3();
+    const handle = {
+      update: (dt) => {
+        t += dt; emitT += dt;
+        if (target.isObject3D) target.getWorldPosition(p); else p.copy(target);
+        disc.position.set(p.x, p.y + 0.04, p.z);
+        disc.rotation.z = t * 0.8;
+        disc.material.opacity = 0.7 + Math.sin(t * 4) * 0.2;
+        while (emitT > 0.05) {
+          emitT -= 0.05;
+          const a = Math.random() * Math.PI * 2, r = radius * Math.sqrt(Math.random());
+          this.pool(Math.random() < 0.3 ? 'star_06' : 'spark_01').emit({
+            pos: tmpV.set(p.x + Math.cos(a) * r, p.y + 0.1, p.z + Math.sin(a) * r),
+            vel: tmpV2.set(0, rand(0.8, 1.6), 0), life: rand(0.8, 1.4), size: [rand(0.08, 0.16), 0.02],
+            color: 0xffffff, color2: color, alpha: [0, 1, 0], spin: rand(-2, 2),
+          });
+        }
+        return alive;
+      },
+      dispose: () => { alive = false; this.root.remove(disc); disc.geometry.dispose(); disc.material.dispose(); },
+    };
+    this.effects.add(handle);
+    return handle;
+  }
+
+  // Flash an object's materials (damage feedback). Gives the object its own
+  // material copies on first use so shared materials on other clones don't flash.
+  hitFlash(object, { color = 0xffffff, intensity = 2.5, duration = 0.15 } = {}) {
+    const mats = [];
+    object.traverse((c) => {
+      if (!c.isMesh) return;
+      if (!c.userData.ownMaterials) {
+        c.material = Array.isArray(c.material) ? c.material.map((m) => m.clone()) : c.material.clone();
+        c.userData.ownMaterials = true;
+      }
+      for (const m of [].concat(c.material)) {
+        if (!m.emissive) continue;
+        m.userData.baseEmissive ??= m.emissive.clone();
+        m.userData.baseIntensity ??= m.emissiveIntensity;
+        mats.push(m);
+      }
+    });
+    const flashColor = new THREE.Color(color);
+    let t = 0;
+    this.effects.add({
+      update: (dt) => {
+        t += dt; const k = Math.max(0, 1 - t / duration);
+        for (const m of mats) {
+          m.emissive.copy(m.userData.baseEmissive).lerp(flashColor, k);
+          m.emissiveIntensity = THREE.MathUtils.lerp(m.userData.baseIntensity, intensity, k);
+        }
+        return t < duration;
+      },
+    });
+  }
+
+  // Floating combat text: vfx.damageNumber(pos, 42) or (pos, 'CRIT!', { color: '#ffcc33' })
+  damageNumber(pos, value, { color = '#ffffff', size = 0.45, duration = 0.9 } = {}) {
+    const text = String(value);
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    ctx.font = '800 96px Inter, system-ui, sans-serif';
+    c.width = Math.ceil(ctx.measureText(text).width) + 32; c.height = 128;
+    ctx.font = '800 96px Inter, system-ui, sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.lineWidth = 12; ctx.strokeStyle = 'rgba(0,0,0,0.85)'; ctx.lineJoin = 'round';
+    ctx.strokeText(text, c.width / 2, 66);
+    ctx.fillStyle = color; ctx.fillText(text, c.width / 2, 66);
+    const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, depthWrite: false, transparent: true }));
+    sprite.renderOrder = 50;
+    sprite.position.copy(pos);
+    const aspect = c.width / c.height;
+    this.root.add(sprite);
+    const drift = rand(-0.3, 0.3);
+    let t = 0;
+    this.effects.add({
+      update: (dt) => {
+        t += dt; const k = t / duration;
+        const pop = k < 0.15 ? 0.6 + (k / 0.15) * 0.6 : 1.2 - Math.min(0.2, (k - 0.15));
+        sprite.scale.set(size * aspect * pop, size * pop, 1);
+        sprite.position.set(pos.x + drift * k, pos.y + k * 1.1, pos.z);
+        sprite.material.opacity = k < 0.7 ? 1 : 1 - (k - 0.7) / 0.3;
+        return k < 1;
+      },
+      dispose: () => { this.root.remove(sprite); tex.dispose(); sprite.material.dispose(); },
+    });
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Camera-facing additive ribbon along a polyline (used by lightning)
+class Ribbon {
+  constructor(maxPoints, color, boost = 1) {
+    this.max = maxPoints;
+    const geo = new THREE.BufferGeometry();
+    this.pos = new Float32Array(maxPoints * 2 * 3);
+    const idx = [];
+    for (let i = 0; i < maxPoints - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    geo.setIndex(idx);
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3).setUsage(THREE.DynamicDrawUsage));
+    this.material = new THREE.ShaderMaterial({
+      uniforms: { color: { value: new THREE.Color(color) }, opacity: { value: 1 }, boost: { value: boost } },
+      vertexShader: 'varying float vSide; void main(){ vSide=float(gl_VertexID % 2)*2.0-1.0; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+      fragmentShader: 'uniform vec3 color; uniform float opacity; uniform float boost; varying float vSide; void main(){ float e=1.0-abs(vSide); gl_FragColor=vec4(mix(color, vec3(1.0), e*e*0.5)*e*opacity*boost*2.0, 0.0);}',
+      transparent: true, depthWrite: false, side: THREE.DoubleSide,
+      blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+    });
+    this.mesh = new THREE.Mesh(geo, this.material);
+    this.mesh.frustumCulled = false;
+    this.geo = geo;
+  }
+
+  set(points, width, camera, opacity) {
+    const n = Math.min(points.length, this.max);
+    const tan = new THREE.Vector3(), toCam = new THREE.Vector3(), side = new THREE.Vector3();
+    for (let i = 0; i < n; i++) {
+      const p = points[i];
+      tan.subVectors(points[Math.min(n - 1, i + 1)], points[Math.max(0, i - 1)]);
+      toCam.subVectors(camera.position, p);
+      side.crossVectors(tan, toCam).normalize().multiplyScalar(width * 0.5);
+      this.pos.set([p.x + side.x, p.y + side.y, p.z + side.z, p.x - side.x, p.y - side.y, p.z - side.z], i * 6);
+    }
+    this.geo.setDrawRange(0, (n - 1) * 6);
+    this.geo.attributes.position.needsUpdate = true;
+    this.material.uniforms.opacity.value = opacity;
+  }
+
+  dispose() { this.geo.dispose(); this.material.dispose(); }
+}
+
+// Midpoint-style jagged path between two points
+function jaggedPath(a, b, segments, amplitude) {
+  const dir = new THREE.Vector3().subVectors(b, a);
+  const n1 = new THREE.Vector3().crossVectors(dir, Math.abs(dir.y) < 0.9 * dir.length() ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0)).normalize();
+  const n2 = new THREE.Vector3().crossVectors(dir, n1).normalize();
+  const pts = [];
+  for (let i = 0; i <= segments; i++) {
+    const k = i / segments;
+    const env = Math.sin(k * Math.PI); // pinned at both ends
+    pts.push(a.clone().lerp(b, k)
+      .addScaledVector(n1, (Math.random() * 2 - 1) * amplitude * env)
+      .addScaledVector(n2, (Math.random() * 2 - 1) * amplitude * env));
+  }
+  return pts;
+}
+
+function shellMaterial(color) {
+  return new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color(color) }, opacity: { value: 1 } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main(){ vec4 mv=modelViewMatrix*vec4(position,1.0); vN=normalize(normalMatrix*normal); vV=normalize(-mv.xyz); gl_Position=projectionMatrix*mv; }',
+    fragmentShader: 'uniform vec3 color; uniform float opacity; varying vec3 vN; varying vec3 vV; void main(){ float f=pow(1.0-abs(dot(vN,vV)),2.0); gl_FragColor=vec4(mix(color,vec3(1.0),f*0.4)*(f*1.6+0.05)*opacity, 0.0); }',
+    transparent: true, depthWrite: false,
+    blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+  });
+}
+
+function columnMaterial(color) {
+  return new THREE.ShaderMaterial({
+    uniforms: { color: { value: new THREE.Color(color) }, opacity: { value: 1 }, time: { value: 0 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
+    fragmentShader: `uniform vec3 color; uniform float opacity; uniform float time; varying vec2 vUv;
+      void main(){ float fade=pow(1.0-vUv.y,1.5); float streak=0.6+0.4*sin(vUv.x*6.2831*10.0+time*8.0)*sin(vUv.y*20.0-time*14.0);
+      gl_FragColor=vec4(mix(color,vec3(1.0),fade*0.5)*fade*streak*opacity*1.6,0.0);}`,
+    transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+  });
 }
 
 // ---------------------------------------------------------------------------
