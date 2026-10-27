@@ -180,3 +180,26 @@ function fixFbxMaterials(obj) {
     c.material = Array.isArray(c.material) ? c.material.map(conv) : conv(c.material);
   });
 }
+
+// A spread of skin and hair tones for giving base characters variety.
+export const SKIN_TONES = { porcelain: 0xf3d4c1, light: 0xe8b796, tan: 0xc68642, brown: 0x8d5524, deep: 0x5a3519, ebony: 0x3b2414 };
+export const HAIR_TONES = { black: 0x1b1612, brown: 0x4a2c17, auburn: 0x8a3b1e, blonde: 0xd8b26e, grey: 0x9a9a9a, white: 0xeeeeee };
+
+// Recolor materials by name on one instance, e.g. recolor(m.object, { Skin: SKIN_TONES.tan, Hair: '#222' }).
+// Materials are cloned first so other instances of the same model keep their colors.
+export function recolor(object, colors) {
+  const keys = Object.fromEntries(Object.entries(colors).map(([k, v]) => [k.toLowerCase(), v]));
+  object.traverse((c) => {
+    if (!c.isMesh) return;
+    const swap = (m) => {
+      const v = keys[m.name.toLowerCase()];
+      if (v == null) return m;
+      const out = m.userData.recolored ? m : m.clone();
+      out.userData.recolored = true;
+      out.color.set(v);
+      return out;
+    };
+    c.material = Array.isArray(c.material) ? c.material.map(swap) : swap(c.material);
+  });
+  return object;
+}

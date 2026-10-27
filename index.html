@@ -87,7 +87,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createStage } from './src/stage.js';
-import { AssetLibrary, fitToSize } from './src/library.js';
+import { AssetLibrary, fitToSize, recolor, SKIN_TONES, HAIR_TONES } from './src/library.js';
 import { VFX } from './src/vfx.js';
 import { createPowerUp, POWERUP_TYPES } from './src/powerups.js';
 import { SoundBoard, SFX_PRESETS } from './src/sfx.js';
@@ -105,6 +105,7 @@ const clock = new THREE.Clock();
 
 const HDRIS = lib.find({ type: 'hdri' });
 const GROUP_LABELS = {
+  'base-characters/people': 'Base characters: people', 'base-characters/modular': 'Base characters: modular', 'base-characters/simple': 'Base characters: simple',
   'mechs': 'Mechs', 'mechs/space': 'Mechs: space crew',
   'characters/cyberpunk': 'Hero: cyberpunk', 'characters/soldiers': 'Soldiers', 'characters/astronauts': 'Astronauts', 'characters/robot': 'Robot',
   'enemies/cyberpunk': 'Enemies: cyberpunk', 'enemies/space': 'Enemies: space', 'enemies/monsters-big': 'Monsters: big',
@@ -205,6 +206,14 @@ async function showModel(id) {
     sel.onchange = () => m.play(sel.value);
     extra.push(sel);
     updaters.push((dt) => m.mixer.update(dt));
+  }
+  if (a.group.startsWith('base-characters')) {
+    for (const [part, tones] of [['Skin', SKIN_TONES], ['Hair', HAIR_TONES]]) {
+      const sel = document.createElement('select'); sel.className = 'chip';
+      sel.innerHTML = `<option value="">${part}: original</option>` + Object.keys(tones).map((t) => `<option value="${t}">${part}: ${t}</option>`).join('');
+      sel.onchange = () => sel.value && recolor(m.object, { [part]: tones[sel.value] });
+      extra.push(sel);
+    }
   }
   toolbar(extra);
   const anim = m.animations.length ? `\nm.play('${m.animations[0].name}');  // + m.mixer.update(dt) each frame` : '';

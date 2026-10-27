@@ -1,8 +1,8 @@
 # Game Asset Library
 
-A drop-in Three.js asset library: **1,154 CC0 assets**:
-- 684 models: mechs, heroes, enemies, monsters, guns, turrets, vehicles, spaceships, pickups, environments
-- 366 sound effects
+A drop-in Three.js asset library: **1,228 CC0 assets**:
+- 759 models: base characters (unarmed people), mechs, heroes, enemies, monsters, guns, turrets, vehicles, spaceships, pickups, environments
+- 365 sound effects
 - 16 PBR materials, 8 HDRIs and 80 particle sprites
 
 It also includes code written for this repo: a VFX system, a sound board, procedural power-ups and a "pro look" renderer preset.
@@ -22,7 +22,7 @@ Open http://localhost:8790. The catalog has four tabs:
 - **VFX:** live demo of every effect, with sound
 - **Power-ups**
 - **Materials**
-- **Audio:** click any of the 366 sounds to hear it
+- **Audio:** click any of the 365 sounds to hear it
 
 Each item shows a copy-paste code snippet.
 
@@ -75,6 +75,13 @@ Sets up HDRI image-based lighting, ACES tone mapping, soft shadows, GTAO ambient
 - `lib.model(id, { size })` returns `{ object, animations, mixer, play(name) }`. Each call gives an independent clone, including skinned meshes.
 - `lib.material(id, { repeat })` returns a full PBR `MeshStandardMaterial`.
 - `lib.find('rifle')` and `lib.find({ group: 'mechs' })` search the manifest.
+- `recolor(m.object, { Skin: SKIN_TONES.tan, Hair: HAIR_TONES.black })` recolors one instance by material name. Use it to vary the base characters.
+
+### Base characters
+75 rigged, animated people with no weapons, for crowds, NPCs and players. All are Quaternius CC0.
+- `base-characters/people`: 46 stylized characters, including casual, chef, doctor, suit, worker, cowboy, kimono, pirate, viking, knight, ninja, wizard and witch, many with male and female versions. Each has 16–17 clips: idle, walk, run, jump, sit, pick up, carry, punch, hit and death. Their original skin is a dark silhouette style; use `recolor` to give them real skin tones.
+- `base-characters/modular`: 21 men and women, including adventurer, beach, casual, farmer, formal, king, punk, sci-fi, suit, SWAT and worker. Each has 24 clips. The pistols and sword that came with a few of them were removed.
+- `base-characters/simple`: 8 plain men and women in casual clothes, shirts, suits and dresses (FBX).
 
 ### `src/vfx.js`: effects
 Effects: `explosion`, `muzzleFlash`, `impact`, `laser`, `lightning` (branching arcs), `emp`, `teleport`, `chargeUp`, `healAura`, `hitFlash`, `damageNumber`, `ring`, `decal`, `pickupBurst`, `shield` (hex fresnel bubble with hit ripples), `trail` (ribbon), `portal`.
@@ -91,6 +98,7 @@ Six types: `health`, `shield`, `ammo`, `speed`, `damage`, `energy`. Each has a p
 
 | Folder | Contents | Source |
 |---|---|---|
+| `assets/base-characters` | 75 rigged, unarmed people: stylized, modular and simple | Quaternius |
 | `assets/mechs` | 4 animated mechs (≈20 clips each: walk, run, shoot, punch, death…) | Quaternius |
 | `assets/mechs/space` | 4 animated space mechs | Quaternius |
 | `assets/characters/cyberpunk`, `soldiers`, `astronauts` | Animated hero, 3 soldiers, 4 astronauts | Quaternius |

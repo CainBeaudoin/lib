@@ -14,6 +14,9 @@ Per-file source and license are recorded in `assets/manifest.json`; each pack fo
 | `assets/space/ships` | Quaternius — Ultimate Spaceships | Quaternius | https://quaternius.com/packs/ultimatespaceships.html | CC0 1.0 |
 | `assets/weapons/guns` | Quaternius — Ultimate Gun Pack | Quaternius | https://quaternius.com/packs/ultimategun.html | CC0 1.0 |
 | `assets/turrets` | Quaternius — Turret Pack | Quaternius | https://quaternius.com/packs/turretpack.html | CC0 1.0 |
+| `assets/base-characters/people` | Quaternius — Ultimate Animated Character Pack | Quaternius | https://quaternius.com/packs/ultimatedanimatedcharacter.html | CC0 1.0 |
+| `assets/base-characters/modular` | Quaternius — Ultimate Modular Men & Women | Quaternius | https://quaternius.com/packs/ultimatemodularcharacters.html | CC0 1.0 |
+| `assets/base-characters/simple` | Quaternius — Animated Men & Women | Quaternius | https://quaternius.com/packs/animatedmen.html | CC0 1.0 |
 | `assets/characters/robot` | Quaternius — Animated Robot | Quaternius | https://quaternius.com/packs/animatedrobot.html | CC0 1.0 |
 | `assets/mechs/space` | Quaternius — Ultimate Space Kit | Quaternius | https://quaternius.com/packs/ultimatespacekit.html | CC0 1.0 |
 | `assets/characters/astronauts` | Quaternius — Ultimate Space Kit | Quaternius | https://quaternius.com/packs/ultimatespacekit.html | CC0 1.0 |
