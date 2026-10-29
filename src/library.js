@@ -53,6 +53,10 @@ export class AssetLibrary {
       const dir = this.base + a.path.slice(0, a.path.lastIndexOf('/') + 1);
       if (a.format === 'fbx') {
         const obj = this.fbx.parse(buffer, dir);
+        // Blender exports often include the scene's lamps and cameras; drop them
+        const junk = [];
+        obj.traverse((o) => { if (o.isLight || o.isCamera) junk.push(o); });
+        junk.forEach((o) => o.parent.remove(o));
         fixFbxMaterials(obj);
         return { scene: obj, animations: obj.animations };
       }
@@ -169,9 +173,14 @@ function fixFbxMaterials(obj) {
       // FBXLoader treats these exports' already-linear colors as sRGB, which
       // crushes them to near-black; undo that second conversion.
       const color = m.map ? m.color.clone() : m.color.clone().convertLinearToSRGB();
+      // real paints rarely exceed ~75% (linear) albedo; pure white blows out under bloom
+      const peak = Math.max(color.r, color.g, color.b);
+      if (peak > 0.75) color.multiplyScalar(0.75 / peak);
+      // some exporters copy the diffuse colour into emissive; keep it only on lights
+      const glows = m.emissiveMap || /light|lamp|glow|emiss|neon|led/i.test(m.name);
       const out = new THREE.MeshStandardMaterial({
         color, map: m.map || null, roughness: 0.55, metalness: 0.15,
-        emissive: m.emissive, emissiveMap: m.emissiveMap || null,
+        emissive: glows ? m.emissive : new THREE.Color(0), emissiveMap: m.emissiveMap || null,
         transparent: m.transparent, opacity: m.opacity, name: m.name,
       });
       if (/metal|steel|iron/i.test(m.name)) { out.metalness = 0.7; out.roughness = 0.35; }

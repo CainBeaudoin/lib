@@ -33,6 +33,21 @@ PACKS = {
   "audio/impact":              ("Kenney — Impact Sounds", "Kenney", "https://kenney.nl/assets/impact-sounds"),
   "audio/interface":           ("Kenney — Interface Sounds", "Kenney", "https://kenney.nl/assets/interface-sounds"),
   "audio/digital":             ("Kenney — Digital Audio", "Kenney", "https://kenney.nl/assets/digital-audio"),
+  "vehicles/racing":           ("Kenney — Starter Kit Racing", "Kenney", "https://github.com/KenneyNL/Starter-Kit-Racing"),
+  "vehicles/cars":             ("Rgsdev — Free Low Poly Vehicles Pack", "Rgsdev", "https://opengameart.org/content/free-low-poly-vehicles-pack"),
+  "vehicles/toon":             ("Lyricsz — 20 Cars with Animation", "Lyricsz", "https://opengameart.org/content/ultimate-3d-car-assets-pack-w-interiors-and-animations"),
+  "vehicles/city":             ("Mehrasaur — 3D Vehicles Pack", "Mehrasaur", "https://opengameart.org/content/3d-vehicles-pack"),
+  "vehicles/classic":          ("Quaternius — Low Poly Cars & Public Transport", "Quaternius", "https://opengameart.org/content/lowpoly-cars"),
+  "vehicles/basic":            ("Daniel Quevedo — Low Poly Vehicles Pack", "Daniel Quevedo", "https://opengameart.org/content/low-poly-vehicles-pack"),
+  "environment/race-track":    ("Kenney — Starter Kit Racing", "Kenney", "https://github.com/KenneyNL/Starter-Kit-Racing"),
+  "props/road":                ("Quaternius — Low Poly Public Transport", "Quaternius", "https://opengameart.org/content/lowpoly-public-transport"),
+  "props/road-basic":          ("Daniel Quevedo — Low Poly Vehicles Pack", "Daniel Quevedo", "https://opengameart.org/content/low-poly-vehicles-pack"),
+  "audio/racing":              ("Kenney — Starter Kit Racing", "Kenney", "https://github.com/KenneyNL/Starter-Kit-Racing"),
+  "audio/car":                 ("ggbotnet — Car Sound Effects Pack", "ggbotnet", "https://opengameart.org/content/car-sound-effects-pack-low-quality"),
+  "audio/engine-loops":        ("domasx2 — Racing Car Engine Sound Loops", "domasx2", "https://opengameart.org/content/racing-car-engine-sound-loops"),
+  "audio/car-extra":           ("looneybits — Car start, doors, blinkers", "looneybits", "https://opengameart.org/users/looneybits"),
+  "audio/car-acceleration":    ("mikeask — Car Acceleration", "mikeask", "https://opengameart.org/content/car-acceleration"),
+  "audio/rocket":              ("theminesareshakin — Rocket Engine", "theminesareshakin", "https://opengameart.org/content/rocket-engine"),
   "hdri":                      ("Poly Haven HDRIs", "Poly Haven", "https://polyhaven.com/hdris"),
   "textures":                  ("ambientCG PBR materials", "ambientCG", "https://ambientcg.com"),
 }
@@ -50,7 +65,7 @@ for folder, (pack, author, url) in PACKS.items():
         continue
     for f in sorted(os.listdir(d)):
         name, ext = os.path.splitext(f); ext = ext[1:].lower()
-        kind = {"glb": "model", "fbx": "model", "hdr": "hdri", "png": "sprite", "ogg": "sound"}.get(ext)
+        kind = {"glb": "model", "fbx": "model", "hdr": "hdri", "png": "sprite", "ogg": "sound", "wav": "sound"}.get(ext)
         if not kind: continue
         it = {"id": f"{folder}/{name}", "type": kind, "category": folder.split("/")[0], "group": folder,
               "path": f"{folder}/{f}", "format": ext, "pack": pack, "author": author, "source": url, "license": CC0}

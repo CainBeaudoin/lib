@@ -5,7 +5,8 @@
 //   const sfx = new SoundBoard(camera, { base: './assets/' });
 //   sfx.play('laser', { position: muzzlePos });
 //   sfx.play('click');                       // 2D UI sound
-//   sfx.play('audio/sci-fi/doorOpen_001');   // any sound id from the manifest
+//   sfx.play('audio/sci-fi/doorOpen_001');   // any sound id from the manifest (.ogg implied)
+//   sfx.play('audio/rocket/rocket_engine.wav'); // other formats: include the extension
 import * as THREE from 'three';
 
 // dir, file prefix, count, first index, zero padding (Kenney packs differ)
@@ -36,6 +37,27 @@ export const SFX_PRESETS = {
   confirm:     fam('interface', 'confirmation_', 4, 1),
   error:       fam('interface', 'error_', 8, 1),
   glitch:      fam('interface', 'glitch_', 4, 1),
+  // cars
+  engineStart: ['audio/car/Car_Engine_Start_Up', 'audio/car/Car2_Engine_Start_Up', 'audio/car-extra/generic_car_startengine.wav'],
+  engineStop:  ['audio/car/Car_Engine_Turning_Off', 'audio/car/Car2_Engine_Turning_Off'],
+  accelerate:  ['audio/car/Car_Acceleration', 'audio/car/Car_Acceleration_2', 'audio/car-acceleration/acceleration.wav'],
+  skid:        ['audio/racing/skid'],
+  crash:       ['audio/racing/impact', ...fam('impact', 'impactPlate_heavy_', 3)],
+  horn:        ['audio/car/Car_Horn'],
+  carDoorOpen: ['audio/car/Car_Door_Open', 'audio/car-extra/door_opening.wav'],
+  carDoorClose: ['audio/car/Car_Door_Close', 'audio/car-extra/door_closing.wav'],
+  trunk:       ['audio/car/Car_Trunk_Open', 'audio/car/Car_Hood_Open'],
+  handbrake:   ['audio/car/Car_Parking_Brake'],
+  blinker:     ['audio/car-extra/blinker01.wav'],
+  rocket:      ['audio/rocket/rocket_engine.wav'],
+};
+
+// Looping engine ids for EngineSound (see vehicle.js)
+export const ENGINE_LOOPS = {
+  car: 'audio/car/Car_Engine_Loop', car2: 'audio/car/Car2_Engine_Loop', truck: 'audio/car/Car_Engine_Loop_2',
+  kart: 'audio/racing/engine', motorcycle: 'audio/racing/engine-motorcycle',
+  race0: 'audio/engine-loops/engine_0.wav', race1: 'audio/engine-loops/engine_1.wav', race2: 'audio/engine-loops/engine_2.wav',
+  race3: 'audio/engine-loops/engine_3.wav', race4: 'audio/engine-loops/engine_4.wav', race5: 'audio/engine-loops/engine_5.wav',
 };
 
 export class SoundBoard {
@@ -68,7 +90,7 @@ export class SoundBoard {
   set volume(v) { this.listener.setMasterVolume(v); }
 
   load(id) {
-    if (!this.buffers.has(id)) this.buffers.set(id, this.loader.loadAsync(this.base + id + '.ogg'));
+    if (!this.buffers.has(id)) this.buffers.set(id, this.loader.loadAsync(this.base + id + (/\.(ogg|wav|mp3)$/.test(id) ? '' : '.ogg')));
     return this.buffers.get(id);
   }
 

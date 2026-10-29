@@ -441,6 +441,60 @@ export class VFX {
     return handle;
   }
 
+  // One frame of engine/booster flame. Call every frame while thrusting.
+  // dir: exhaust direction (world). scale ~ nozzle radius in metres.
+  thrust(pos, dir, { color = 0x5cc8ff, core = 0xffffff, scale = 0.2, smoke = true } = {}) {
+    const d = tmpV.copy(dir).normalize();
+    for (let i = 0; i < 2; i++) {
+      this.pool(i ? 'flame_05' : 'flame_03').emit({
+        pos: tmpV2.copy(pos).addScaledVector(d, scale * 0.6), vel: d.clone().multiplyScalar(rand(4, 7)).add(randDir().multiplyScalar(0.4)),
+        life: rand(0.06, 0.12), size: [scale * 2.2, scale * 0.8], color: core, color2: color, alpha: [1, 0.9, 0], drag: 2,
+      });
+    }
+    this.pool('light_01').emit({ pos, life: 0.05, size: [scale * 3, scale * 2], color, alpha: [0.8, 0.8, 0] });
+    if (smoke && Math.random() < 0.35) {
+      this.pool('smoke_07', false).emit({ pos: tmpV2.copy(pos).addScaledVector(d, scale * 3), vel: d.clone().multiplyScalar(1.5).setY(0.4), life: rand(0.6, 1.1), size: [scale * 1.5, scale * 5], color: 0x9a9a9a, alpha: [0, 0.18, 0], spin: rand(-1, 1), drag: 1.2 });
+    }
+  }
+
+  // Missile from `from` to `to` on a shallow arc, with a smoke/fire trail; explodes on arrival.
+  // Resolves with the impact position.
+  missile(from, to, { speed = 18, arc = 0.15, color = 0xff8a3d, scale = 1, onImpact = null } = {}) {
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.035 * scale, 0.05 * scale, 0.34 * scale, 8).rotateX(Math.PI / 2),
+      new THREE.MeshStandardMaterial({ color: 0xe8e8e8, metalness: 0.4, roughness: 0.4 }));
+    this.scene.add(body);
+    const trail = this.trail(body, { color, width: 0.12 * scale, length: 24 });
+    const dist = from.distanceTo(to);
+    const dur = dist / speed;
+    const mid = from.clone().lerp(to, 0.5); mid.y += dist * arc;
+    const p = new THREE.Vector3(), prev = from.clone();
+    let t = 0;
+    return new Promise((resolve) => {
+      const fx = {
+        update: (dt) => {
+          t = Math.min(1, t + dt / dur);
+          const u = 1 - t;
+          p.set(0, 0, 0).addScaledVector(from, u * u).addScaledVector(mid, 2 * u * t).addScaledVector(to, t * t);
+          body.position.copy(p);
+          if (p.distanceToSquared(prev) > 1e-8) body.lookAt(p.clone().add(p.clone().sub(prev)));
+          this.thrust(p, prev.clone().sub(p), { color, core: 0xfff0c0, scale: 0.08 * scale, smoke: true });
+          prev.copy(p);
+          if (t < 1) return true;
+          this.explosion(to, { scale: 0.8 * scale });
+          onImpact?.(to);
+          resolve(to);
+          return false; // VFX.update then calls dispose()
+        },
+        dispose: () => {
+          if (!body.parent) return;
+          this.scene.remove(body); body.geometry.dispose(); body.material.dispose();
+          trail.dispose(); this.effects.delete(trail);
+        },
+      };
+      this.effects.add(fx);
+    });
+  }
+
   // Branching electric arc that re-forks every few frames. Returns { dispose() }
   lightning(from, to, { color = 0x8fd8ff, duration = 0.3, width = 0.08, branches = 2, impact = true } = {}) {
     const a = from.clone(), b = to.clone();

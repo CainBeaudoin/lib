@@ -14,7 +14,7 @@ const DEFAULTS = {
   showBackground: false, // draw the HDRI as the sky
   background: 0x0b0d12,
   exposure: 1.0,
-  bloom: { strength: 0.6, radius: 0.4, threshold: 0.85 },
+  bloom: { strength: 0.6, radius: 0.4, threshold: 1.0 }, // above 1: only emissive/VFX glow, not lit white paint
   ao: true,
   shadows: true,
   pixelRatio: Math.min(window.devicePixelRatio, 2),

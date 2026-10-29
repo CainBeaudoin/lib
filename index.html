@@ -67,6 +67,7 @@
     </header>
     <div class="tabs" id="tabs">
       <button data-tab="models" class="on">Models</button>
+      <button data-tab="garage">Garage</button>
       <button data-tab="vfx">VFX</button>
       <button data-tab="powerups">Power-ups</button>
       <button data-tab="materials">Materials</button>
@@ -90,7 +91,9 @@ import { createStage } from './src/stage.js';
 import { AssetLibrary, fitToSize, recolor, SKIN_TONES, HAIR_TONES } from './src/library.js';
 import { VFX } from './src/vfx.js';
 import { createPowerUp, POWERUP_TYPES } from './src/powerups.js';
-import { SoundBoard, SFX_PRESETS } from './src/sfx.js';
+import { SoundBoard, SFX_PRESETS, ENGINE_LOOPS } from './src/sfx.js';
+import { loadVehicle } from './src/vehicle.js';
+import { PARTS } from './src/parts.js';
 
 const $ = (id) => document.getElementById(id);
 const lib = await AssetLibrary.load('./assets/');
@@ -111,7 +114,9 @@ const GROUP_LABELS = {
   'enemies/cyberpunk': 'Enemies: cyberpunk', 'enemies/space': 'Enemies: space', 'enemies/monsters-big': 'Monsters: big',
   'enemies/monsters-blob': 'Monsters: blob', 'enemies/monsters-flying': 'Monsters: flying',
   'weapons/guns': 'Guns', 'weapons/blasters': 'Blasters', 'turrets': 'Turrets', 'turrets/cyberpunk': 'Turrets: cyberpunk',
-  'pickups/space': 'Pickups', 'vehicles/space': 'Vehicles', 'space/ships': 'Spaceships', 'space/kit': 'Space kit',
+  'pickups/space': 'Pickups', 'vehicles/space': 'Vehicles: space', 'space/ships': 'Spaceships', 'space/kit': 'Space kit',
+  'vehicles/racing': 'Vehicles: racing', 'vehicles/cars': 'Vehicles: cars', 'vehicles/toon': 'Vehicles: toon', 'vehicles/city': 'Vehicles: city', 'vehicles/classic': 'Vehicles: classic', 'vehicles/basic': 'Vehicles: basic',
+  'environment/race-track': 'Race track', 'props/road': 'Road props', 'props/road-basic': 'Road props: basic',
   'environment/planet': 'Planet outpost', 'environment/space-station': 'Space station', 'environment/prototype': 'Prototype / blockout',
 };
 const models = lib.find({ type: 'model' });
@@ -220,6 +225,124 @@ async function showModel(id) {
   info(id.split('/').pop(), `${lic(a)} · ${a.format.toUpperCase()}${a.animations ? ` · ${a.animations.length} animations` : ''}`,
     `const m = await lib.model('${id}', { size: 2 });\nscene.add(m.object);${anim}`);
   history.replaceState(null, '', '#' + id);
+}
+
+
+// ---------------------------------------------------------------- garage tab
+// One loadout, any vehicle: parts are sized from the car they're mounted on.
+const VEHICLE_GROUPS = ['vehicles/racing', 'vehicles/cars', 'vehicles/toon', 'vehicles/city', 'vehicles/classic', 'vehicles/basic'];
+// [model id, size as a fraction of car width, weapon ammo or null]
+const LIB_PARTS = { turret: ['space/kit/turret_double', 0.32, 'bullet'], minigun: ['turrets/Laser_MachineGun', 0.4, 'bullet'], cannon: ['turrets/Cannon_3', 0.42, 'missile'], blaster: ['weapons/blasters/blaster-h', 0.42, 'bullet'], radar: ['space/kit/satelliteDish', 0.3, null] };
+const SLOT_OPTIONS = {
+  roof: ['roofRack', 'cargoBox', 'luggage', 'lightBar', 'rocketPod', 'turret', 'minigun', 'radar'],
+  hood: ['hoodScoop', 'blaster', 'cannon'], trunk: ['spoiler'], front: ['bullBar'], under: ['underglow'], sides: ['boosters'],
+};
+const DRIVERS = ['base-characters/people/Casual_Male', 'base-characters/people/Suit_Female', 'base-characters/people/Worker_Male', 'base-characters/modular/Female_Punk', 'base-characters/people/Doctor_Female_Young', 'base-characters/people/Cowboy_Male'];
+const PAINT = { original: null, red: 0xc0182a, orange: 0xff6a13, yellow: 0xf2c218, green: 0x1f9e55, blue: 0x1b56c9, purple: 0x6a2bc2, white: 0xeeeeee, black: 0x1a1a1c };
+const garage = { id: 'vehicles/cars/Sports', loadout: { roof: 'rocketPod', trunk: 'spoiler', under: 'underglow' }, paint: null, driver: DRIVERS[0], engine: 'race2', drive: true, car: null };
+
+async function buildPart(car, name) {
+  if (PARTS[name]) return { part: PARTS[name](car.dims), opts: {} };
+  const [id, k, ammo] = LIB_PARTS[name];
+  const m = await lib.model(id);
+  return { part: m.object, opts: { size: car.dims.w * k, weapon: !!ammo, ammo: ammo ?? undefined } };
+}
+
+async function equipSlot(car, slot, name) {
+  garage.loadout[slot] = name || undefined;
+  if (!name) { car.unequip(slot); return; }
+  const { part, opts } = await buildPart(car, name);
+  if (garage.car === car) car.equip(slot, part, opts);
+}
+
+function garageList() {
+  const groups = {};
+  for (const a of models) if (VEHICLE_GROUPS.includes(a.group)) (groups[a.group] ??= []).push(a);
+  $('list').innerHTML = VEHICLE_GROUPS.filter((g) => groups[g]).map((g) =>
+    `<div class="group-title"><span>${GROUP_LABELS[g]}</span><span>${groups[g].length}</span></div>` +
+    groups[g].map((a) => `<button class="item${garage.id === a.id ? ' on' : ''}" data-id="${a.id}">${a.id.split('/').pop()}</button>`).join('')).join('');
+  $('list').onclick = (e) => { const b = e.target.closest('.item'); if (b) { garage.id = b.dataset.id; showGarage(); } };
+}
+
+function select(label, options, value, onchange) {
+  const sel = document.createElement('select'); sel.className = 'chip';
+  sel.innerHTML = options.map(([v, t]) => `<option value="${v}">${label}: ${t}</option>`).join('');
+  sel.value = value ?? ''; sel.onchange = () => onchange(sel.value);
+  return sel;
+}
+
+function garageCode() {
+  const lo = Object.entries(garage.loadout).filter(([, v]) => v);
+  const lines = lo.map(([slot, n]) => PARTS[n] ? `car.equip('${slot}', PARTS.${n}(car.dims));` : `car.equip('${slot}', (await lib.model('${LIB_PARTS[n][0]}')).object, { size: car.dims.w * ${LIB_PARTS[n][1]}${LIB_PARTS[n][2] ? `, weapon: true, ammo: '${LIB_PARTS[n][2]}'` : ''} });`);
+  return `import { loadVehicle } from './src/vehicle.js';
+import { PARTS } from './src/parts.js';
+const car = await loadVehicle(lib, '${garage.id}', { length: 4.2 });
+scene.add(car.object);
+${lines.join('\n')}${garage.paint != null ? `\ncar.paint(0x${garage.paint.toString(16).padStart(6, '0')});` : ''}${garage.driver ? `\nawait car.addDriver(lib, '${garage.driver}');` : ''}
+car.engine(sfx, '${garage.engine}');
+// every frame: car.update(dt, { speed, steer });
+// car.transform('combat' | 'boost' | 'hover', { vfx, sfx });   car.fire(vfx, sfx, target);`;
+}
+
+async function showGarage() {
+  clearContent(); current = null; await addFloor();
+  garageList();
+  $('loading').style.display = 'block';
+  const id = garage.id;
+  const car = await loadVehicle(lib, id, { length: 4.2 });
+  $('loading').style.display = 'none';
+  if (tab !== 'garage' || garage.id !== id) return;
+  garage.car?.stopEngine();
+  garage.car = car;
+  content.add(car.object);
+  for (const [slot, name] of Object.entries(garage.loadout)) if (name) await equipSlot(car, slot, name);
+  if (garage.paint != null) car.paint(garage.paint);
+  if (garage.driver) await car.addDriver(lib, garage.driver);
+  car.engine(sfx, garage.engine, { volume: 0.35 });
+  camera.position.set(10, 5.5, 11); controls.target.set(0, 0.6, 0); controls.update();
+  window.__garage = garage;
+
+  // drive in a circle, or sit on a slow turntable
+  let ang = 0;
+  const R = 5.5;
+  updaters.push((dt) => {
+    if (garage.drive) {
+      const speed = 9;
+      ang += (speed / R) * dt;
+      car.object.position.set(Math.cos(ang) * R, 0, Math.sin(ang) * R);
+      car.object.rotation.y = -ang;   // tangent of the circle (+Z forward)
+      car.update(dt, { speed, steer: Math.atan(car.dims.l * 0.6 / R) });
+    } else {
+      car.object.position.set(0, 0, 0);
+      car.object.rotation.y += dt * 0.25;
+      car.update(dt, { speed: 0, steer: Math.sin(performance.now() / 900) * 0.35 });
+    }
+  });
+
+  const T = (label, fn) => chip(label, fn);
+  const opt = (names) => [['', 'none'], ...names.map((n) => [n, n.replace(/([A-Z])/g, ' $1').toLowerCase()])];
+  const extra = [
+    select('Paint', Object.keys(PAINT).map((k) => [k, k]), Object.keys(PAINT).find((k) => PAINT[k] === garage.paint) ?? 'original', (v) => { garage.paint = PAINT[v]; if (PAINT[v] != null) car.paint(PAINT[v]); else showGarage(); }),
+    ...Object.entries(SLOT_OPTIONS).map(([slot, names]) => select(slot[0].toUpperCase() + slot.slice(1), opt(names), garage.loadout[slot], async (v) => { await equipSlot(car, slot, v); garageInfo(); })),
+    select('Driver', [['', 'none'], ...DRIVERS.map((d) => [d, d.split('/').pop()])], garage.driver, async (v) => { garage.driver = v || null; if (v) await car.addDriver(lib, v); else car.removeDriver(); garageInfo(); }),
+    select('Engine', Object.keys(ENGINE_LOOPS).map((k) => [k, k]), garage.engine, (v) => { garage.engine = v; car.engine(sfx, v, { volume: 0.35 }); garageInfo(); }),
+    T(garage.drive ? 'Park' : 'Drive', (e) => { garage.drive = !garage.drive; e.target.textContent = garage.drive ? 'Park' : 'Drive'; }),
+    T('Combat mode', async () => { await car.transform('combat', { vfx, sfx }); garage.loadout.roof = garage.loadout.roof ?? 'rocketPod'; }),
+    T('Fire', () => {
+      const ahead = new THREE.Vector3(0, 0, 14).applyQuaternion(car.object.quaternion).add(car.object.position).setY(0);
+      car.fire(vfx, sfx, ahead);
+    }),
+    T('Boost', () => car.transform('boost', { vfx, sfx, duration: 2.5 })),
+    T('Hover', () => car.transform('hover', { vfx, sfx })),
+    T('Horn', () => sfx.play('horn', { position: car.object.position })),
+  ];
+  toolbar(extra);
+  garageInfo();
+}
+
+function garageInfo() {
+  const a = lib.get(garage.id);
+  info(garage.id.split('/').pop(), `${lic(a)} · ${a.format.toUpperCase()} · ${garage.car?.wheels.length ?? 0} wheels rigged · slots: ${garage.car?.slots.join(', ')}`, garageCode());
 }
 
 // ---------------------------------------------------------------- VFX tab
@@ -358,7 +481,7 @@ async function showMaterials(id) {
 }
 
 // ---------------------------------------------------------------- audio tab
-const SOUND_LABELS = { 'audio/sci-fi': 'Sci-fi', 'audio/impact': 'Impacts & footsteps', 'audio/interface': 'Interface', 'audio/digital': 'Digital / retro' };
+const SOUND_LABELS = { 'audio/car': 'Car', 'audio/racing': 'Racing', 'audio/engine-loops': 'Engine loops', 'audio/car-extra': 'Car: start, doors, blinkers', 'audio/car-acceleration': 'Car: acceleration', 'audio/rocket': 'Rocket engine', 'audio/sci-fi': 'Sci-fi', 'audio/impact': 'Impacts & footsteps', 'audio/interface': 'Interface', 'audio/digital': 'Digital / retro' };
 async function showAudio() {
   clearContent(); current = null; await addFloor();
   const p = createPowerUp('energy'); content.add(p.object); updaters.push((dt) => p.update(dt));
@@ -374,7 +497,7 @@ sfx.play('click');                              // 2D UI sound
   for (const s of sounds) (groups[s.group] ??= []).push(s);
   $('list').innerHTML = Object.keys(SOUND_LABELS).filter((g) => groups[g]).map((g) =>
     `<div class="group-title"><span>${SOUND_LABELS[g]}</span><span>${groups[g].length}</span></div>` +
-    groups[g].map((s) => `<button class="item" data-id="${s.id}">${s.id.split('/').pop()}</button>`).join('')).join('');
+    groups[g].map((s) => `<button class="item" data-id="${s.format === 'ogg' ? s.id : s.path}">${s.id.split('/').pop()}</button>`).join('')).join('');
   $('list').onclick = (e) => {
     const b = e.target.closest('.item'); if (!b) return;
     document.querySelectorAll('.item.on').forEach((el) => el.classList.remove('on')); b.classList.add('on');
@@ -390,13 +513,15 @@ function renderSimpleList(items) {
 // ---------------------------------------------------------------- wiring
 async function setTab(t) {
   tab = t;
+  garage.car?.stopEngine(); garage.car = null;
   document.querySelectorAll('#tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
   $('q').parentElement.style.display = t === 'models' ? '' : 'none';
   if (t === 'models') {
     $('list').onclick = (e) => { const b = e.target.closest('.item'); if (b) showModel(b.dataset.id); };
     renderModelList();
     await showModel(current && lib.byId.has(current) && lib.get(current).type === 'model' ? current : 'mechs/George');
-  } else if (t === 'vfx') await showVfx();
+  } else if (t === 'garage') await showGarage();
+  else if (t === 'vfx') await showVfx();
   else if (t === 'powerups') await showPowerups();
   else if (t === 'audio') await showAudio();
   else await showMaterials();

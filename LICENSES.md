@@ -35,6 +35,21 @@ Per-file source and license are recorded in `assets/manifest.json`; each pack fo
 | `assets/audio/impact` | Kenney — Impact Sounds | Kenney | https://kenney.nl/assets/impact-sounds | CC0 1.0 |
 | `assets/audio/interface` | Kenney — Interface Sounds | Kenney | https://kenney.nl/assets/interface-sounds | CC0 1.0 |
 | `assets/audio/digital` | Kenney — Digital Audio | Kenney | https://kenney.nl/assets/digital-audio | CC0 1.0 |
+| `assets/vehicles/racing` | Kenney — Starter Kit Racing | Kenney | https://github.com/KenneyNL/Starter-Kit-Racing | CC0 1.0 |
+| `assets/vehicles/cars` | Rgsdev — Free Low Poly Vehicles Pack | Rgsdev | https://opengameart.org/content/free-low-poly-vehicles-pack | CC0 1.0 |
+| `assets/vehicles/toon` | Lyricsz — 20 Cars with Animation | Lyricsz | https://opengameart.org/content/ultimate-3d-car-assets-pack-w-interiors-and-animations | CC0 1.0 |
+| `assets/vehicles/city` | Mehrasaur — 3D Vehicles Pack | Mehrasaur | https://opengameart.org/content/3d-vehicles-pack | CC0 1.0 |
+| `assets/vehicles/classic` | Quaternius — Low Poly Cars & Public Transport | Quaternius | https://opengameart.org/content/lowpoly-cars | CC0 1.0 |
+| `assets/vehicles/basic` | Daniel Quevedo — Low Poly Vehicles Pack | Daniel Quevedo | https://opengameart.org/content/low-poly-vehicles-pack | CC0 1.0 |
+| `assets/environment/race-track` | Kenney — Starter Kit Racing | Kenney | https://github.com/KenneyNL/Starter-Kit-Racing | CC0 1.0 |
+| `assets/props/road` | Quaternius — Low Poly Public Transport | Quaternius | https://opengameart.org/content/lowpoly-public-transport | CC0 1.0 |
+| `assets/props/road-basic` | Daniel Quevedo — Low Poly Vehicles Pack | Daniel Quevedo | https://opengameart.org/content/low-poly-vehicles-pack | CC0 1.0 |
+| `assets/audio/racing` | Kenney — Starter Kit Racing | Kenney | https://github.com/KenneyNL/Starter-Kit-Racing | CC0 1.0 |
+| `assets/audio/car` | ggbotnet — Car Sound Effects Pack | ggbotnet | https://opengameart.org/content/car-sound-effects-pack-low-quality | CC0 1.0 |
+| `assets/audio/engine-loops` | domasx2 — Racing Car Engine Sound Loops | domasx2 | https://opengameart.org/content/racing-car-engine-sound-loops | CC0 1.0 |
+| `assets/audio/car-extra` | looneybits — Car start, doors, blinkers | looneybits | https://opengameart.org/users/looneybits | CC0 1.0 |
+| `assets/audio/car-acceleration` | mikeask — Car Acceleration | mikeask | https://opengameart.org/content/car-acceleration | CC0 1.0 |
+| `assets/audio/rocket` | theminesareshakin — Rocket Engine | theminesareshakin | https://opengameart.org/content/rocket-engine | CC0 1.0 |
 | `assets/hdri` | Poly Haven HDRIs | Poly Haven | https://polyhaven.com/hdris | CC0 1.0 |
 | `assets/textures` | ambientCG PBR materials | ambientCG | https://ambientcg.com | CC0 1.0 |
 
